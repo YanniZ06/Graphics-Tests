@@ -4,22 +4,23 @@ import sdl.SDL;
 import sdl_extend.Mouse.MouseButton;
 import sdl.Window;
 import sdl.Renderer;
+import haxe.Timer.stamp as getTicks;
 
 class Main {
-    public static var fps(default, set):Int; // Set in Main!!
+    public static var fps(default, set):Int = 30; // Set in Main!!
     static var usedFps:Int = 0;
     static var _curFPSCnt:Int = 0;
     /* static function get_usedFps():Int {
         return Math.floor(fps / ((lastElapsed / 1000) * fps)); // Check out how to optimize
     }*/
-    static var frameDurMS:Int = 0;
+    static var frameDurMS:Float = 0;
 
-    static var lastTickMS:UInt = 0;
-    static var lastElapsed:Int = 0;
-    static inline function elapsedTicks():Int {
-        final l = lastTickMS; // Pass by Value
-        lastTickMS = SDL.getTicks();
-        lastElapsed = lastTickMS - l;
+    static var lastStamp:Float = 0;
+    static var lastElapsed:Float = 0;
+    static inline function elapsedTicks():Float {
+        final l = lastStamp; // Pass by Value
+        lastStamp = getTicks();
+        lastElapsed = lastStamp - l;
 
         return lastElapsed;
     }
@@ -35,18 +36,21 @@ class Main {
         SDL.stopTextInput();
 
         while(update(elapsedTicks())) {
-            final toWait = frameDurMS - update_msTaken;
-            if(toWait > 0) SDL.delay(toWait);
+            final toWait = frameDurMS - update_timeTaken;
+            if(toWait > 0) Sys.sleep(toWait);
         }
 
     }
 
-    static var _fpsSecCnt:Int = 0;
-    static var update_msTaken:Int = 0;
+    static var _fpsSecCnt:Float = 0;
+    static var update_timeTaken:Float = 0;
     static var red = 255;
     static var blue = 255;
     static var textInput = "";
-    static function update(elapsedMs:Int) {
+    static function update(elapsed:Float) {
+        red = Math.floor(255* Math.random());
+        blue = Math.floor(255* Math.random());
+
         while(SDL.hasAnEvent()) {
             var e = SDL.pollEvent();
             switch(e.type) {
@@ -55,7 +59,7 @@ class Main {
                 case SDL_MOUSEBUTTONDOWN: // Mouse Click
                 switch(e.button.button) {
                     case SDL_BUTTON_LEFT: 
-                        trace("MS elapsed since last frame: " + elapsedMs);
+                        trace("MS elapsed since last frame: " + elapsed);
                         trace("Currently set FPS: " + fps);
                         trace("Currently used FPS: " + usedFps);
                         trace("FPS frame delay MS: " + frameDurMS);
@@ -84,26 +88,25 @@ class Main {
                 default:
             }
 
-            red = Math.floor(255* Math.random());
-            blue = Math.floor(255* Math.random());
-            
             SDL.setRenderDrawColor(state.renderer, red, blue, 255, 255);
             SDL.renderClear(state.renderer);
             SDL.renderPresent(state.renderer);
         }
 
         _curFPSCnt++;
-        _fpsSecCnt += elapsedMs;
-        if(_fpsSecCnt >= 1000) {
+        _fpsSecCnt += elapsed;
+        if(_fpsSecCnt >= 1) {
             usedFps = _curFPSCnt;
-            _curFPSCnt = _fpsSecCnt = 0; // Reset FPS 
+            _fpsSecCnt = _curFPSCnt = 0; // Reset FPS 
         }
-        update_msTaken = SDL.getTicks() - lastTickMS;
+        update_timeTaken = getTicks() - lastStamp;
+        // SDL.setHint(SDL_HINT_RENDER_VSYNC, 'true');
         return true;
     }
 
     static function set_fps(st:Int):Int { 
-        frameDurMS = Math.floor((1 / st) * 1000) - 1;
+        // final oldFps = fps;
+        frameDurMS = (1 / st);
         usedFps = st;
         return fps = st; 
     }
