@@ -106,7 +106,7 @@ class Main {
 
     static function set_fps(st:Int):Int { 
         // final oldFps = fps;
-        frameDurMS = (1 / st);
+        frameDurMS = (1 / st) / (1 + (0.005 * (fps / 30)));
         usedFps = st;
         return fps = st; 
     }
