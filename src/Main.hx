@@ -37,7 +37,7 @@ class Main {
 
         while(update(elapsedTicks())) {
             final toWait = frameDurMS - update_timeTaken;
-            if(toWait > 0) Sys.sleep(toWait);
+            if(toWait > 0) Sys.sleep(toWait); // todo: sleep is highly inaccurate, use an accumulator!! (https://gafferongames.com/post/fix_your_timestep/)
         }
 
     }
@@ -59,10 +59,10 @@ class Main {
                 case SDL_MOUSEBUTTONDOWN: // Mouse Click
                 switch(e.button.button) {
                     case SDL_BUTTON_LEFT: 
-                        trace("MS elapsed since last frame: " + elapsed);
+                        trace("Seconds elapsed since last frame: " + elapsed);
                         trace("Currently set FPS: " + fps);
                         trace("Currently used FPS: " + usedFps);
-                        trace("FPS frame delay MS: " + frameDurMS);
+                        trace("FPS frame delay Seconds: " + frameDurMS);
                         trace("---------------------------------\n");
 
                     case SDL_BUTTON_RIGHT:
@@ -106,7 +106,7 @@ class Main {
 
     static function set_fps(st:Int):Int { 
         // final oldFps = fps;
-        frameDurMS = (1 / st) / (1 + (0.005 * (fps / 30)));
+        frameDurMS = (1 / st); // * 0. + (0.001 * fps); // * (1 + (0.0003 * ((fps * fps) / 30))); // 0.0005
         usedFps = st;
         return fps = st; 
     }
