@@ -1,5 +1,8 @@
 package;
 
+import sys.thread.EventLoop;
+import sdl.Event;
+import sys.thread.Thread;
 import haxe.Timer;
 import sdl.SDL;
 import sdl_extend.Mouse.MouseButton;
@@ -30,7 +33,8 @@ class Main {
         return Math.floor(fps / ((lastElapsed / 1000) * fps)); // Check out how to optimize
     }*/
     static var frameDurMS:Ticks = 0;
-    static var updateTimerID:Int;
+    // static var updateTimerID:Int;
+    static var updateTimer:Timer;
 
     static var lastStamp:Ticks = 0;
     static var lastElapsed:Ticks = 0;
@@ -45,7 +49,15 @@ class Main {
     static var shouldClose:Bool = false;
     static var state:{ window:Window, renderer:Renderer };
     
+    /*static function tmr_callback(interval:Int, data:{someint:Int}):Int { // TODO: figure out why this crashes, and why haxe.Timer isnt working?? one of them needs to!!
+        trace('timer fired from $interval with data:'+data);
+        globalUpdate();
+        return 0;
 
+    }*/
+
+    static var updateLoopThread:Thread;
+    static var mainThread:Thread;
     static function main() {
         fps = 60;
 
@@ -53,36 +65,69 @@ class Main {
         state = SDL.createWindowAndRenderer(320, 320, SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
         SDL.setWindowTitle(state.window, "SDL TEST");
         SDL.stopTextInput();
-        
-        updateTimerID = SDL.addTimer(frameDurMS, (timeSet, dynamicObj) -> { // TODO: figure out why this crashes, and why haxe.Timer isnt working?? one of them needs to!!
-            trace(timeSet);
-            trace(dynamicObj);
-            globalUpdate();
-            return 0;
-        }, 0);
-        /* updateTimer.run = () -> {
-            globalUpdate();
-            updateTimer.stop();
-        };*/
+
+        mainThread = Thread.current();
+        updateLoopThread = Thread.createWithEventLoop(() -> {
+            //Thread.runWithEventLoop(() -> {
+            updateTimer = new Timer(frameDurMS);
+            updateTimer.run = () -> {
+                fireSDLUserEvent();
+                // SDL.registerEvents(1);
+
+                // globalUpdate();
+            };
+            //});
+        });
+        // Thread.runWithEventLoop();
+        /* updateLoopThread = Thread.create(() -> {
+
+        }); */ 
         startAppLoop();
+
+        // updateTimerID = SDL.addTimer(frameDurMS, tmr_callback, {someint:frameDurMS});
         //final toWait = frameDurMS - update_timeTaken;
 
     }
 
+    @:functionCode('
+        SDL_Event event;
+        event.type = SDL_USEREVENT;
+
+        SDL_PushEvent (&event);
+        return event;
+    ')
+    static function fireSDLUserEvent():Event {
+        throw 'SDLUSEREVENT CREATION FAILED';
+    }
+
     
     static var textInput = "";
+    static var numRendersRequested:Int = 0;
     static function startAppLoop():Void {
         while(!shouldClose) { 
             // We constantly poll events. Our update timer runs on the defined FPS on its own!
             var continueEventSearch = SDL.hasAnEvent();
+            var renderRequested:Bool = false; 
 
             while(continueEventSearch) {
                 var e = SDL.pollEvent();
                 switch(e.type) {
-                    case SDL_QUIT: continueEventSearch = !(shouldClose = onQuit()) && SDL.hasAnEvent(); // If onQuit returns true we are actually quitting, otherwise we're not!! Useful for "Save / Cancel" operations
-    
+                    case SDL_USEREVENT: // Our UserEvent requests a Render, so we do that!We call update here so its all in the same Thread!!
+                        renderRequested = true;
+                        numRendersRequested++;
+
+                        updateLoopThread.events.run(() -> {
+                            updateTimer.stop();
+                            updateTimer = new Timer(100000); // Block the updating Timer until we need to setup the next updateLoopThread. 
+                        });
+
+                    case SDL_QUIT: 
+                        continueEventSearch = !(shouldClose = onQuit()) && SDL.hasAnEvent(); // If onQuit returns true we are actually quitting, otherwise we're not!! Useful for "Save / Cancel" operations
+                        renderRequested = (!shouldClose && renderRequested);
+                        trace("QUIT REQUEST! DID ACCEPT QUIT?? - " + shouldClose);
+
                     case SDL_MOUSEBUTTONDOWN: // Mouse Click
-                    switch(e.button.button) {
+                    switch(e.button.button) { // Lets find out what Mouse Part clicked!!
                         case SDL_BUTTON_LEFT: 
                             trace("Seconds elapsed since last frame: " + lastElapsed);
                             trace("Currently set FPS: " + fps);
@@ -115,51 +160,68 @@ class Main {
 
                 continueEventSearch = SDL.hasAnEvent();
             }
+
+            if(renderRequested) {
+                if(numRendersRequested > 1) logWarning('Requested a total of $numRendersRequested renders before actually rendering!');
+                numRendersRequested = 0;
+
+                globalUpdate();
+                update_timeTaken = SDL.getTicks() - lastStamp;
+
+                var nextFrameMS = frameDurMS - update_timeTaken;
+                if(nextFrameMS <= 0) {
+                    fireSDLUserEvent();
+                    // SDL.registerEvents(1);
+
+                    continue;
+                }
+        
+                /*updateTimerID = SDL.addTimer(nextFrameMS, (timeSet, dynamicObj) -> {
+                    globalUpdate();
+                    return 0;
+                }, 0);*/
+        
+                updateLoopThread.events.run(() -> {
+                    updateTimer.stop();
+        
+                    updateTimer = new Timer(nextFrameMS);
+                    updateTimer.run = () -> {
+                        fireSDLUserEvent();
+                        // SDL.registerEvents(1);
+                    };
+                });
+            }
         }
 
         // Exiting our application from here on out, we can stop the update timer and clean up everything!!
-        SDL.removeTimer(updateTimerID);
-        //updateTimer.stop();
+        // SDL.removeTimer(updateTimerID);
+        updateTimer.stop();
     }
+
+    inline static function logWarning(warning:Dynamic) {
+        trace('Warning: $warning (Registered at: ${Date.now()})');
+    } 
 
     static var _fpsSecCnt:Ticks = 0;
     static var update_timeTaken:Int = 0;
     #if !debug inline #end static function globalUpdate():Void { // TODO: accumulator?
-        trace("updated");
-        SDL.removeTimer(updateTimerID);
+        // SDL.removeTimer(updateTimerID);
 
         update(elapsedTicks());
         render();
 
         _curFPSCnt++;
         _fpsSecCnt += lastElapsed;
-        if(_fpsSecCnt >= 1) {
+        if(_fpsSecCnt >= 1000) {
             usedFps = _curFPSCnt;
             _fpsSecCnt = _curFPSCnt = 0; // Reset FPS 
         }
-        update_timeTaken = SDL.getTicks() - lastStamp;
-
-        var nextFrameMS = frameDurMS - update_timeTaken;
-        if(nextFrameMS <= 0) {
-            globalUpdate();
-            return;
-        }
-
-        updateTimerID = SDL.addTimer(nextFrameMS, (timeSet, dynamicObj) -> {
-            globalUpdate();
-            return 0;
-        }, 0);
-
-        /* updateTimer = new Timer(nextFrameMS);
-        updateTimer.run = () -> {
-            globalUpdate();
-            updateTimer.stop();
-        }; */ 
     }
 
     dynamic static function onQuit():Bool return true;
 
     static function render():Void {
+        // trace("RENDERED!");
         SDL.setRenderDrawColor(state.renderer, red, blue, 255, 255);
         SDL.renderClear(state.renderer);
         SDL.renderPresent(state.renderer);
@@ -167,7 +229,15 @@ class Main {
 
     static var red = 255;
     static var blue = 255;
+    static var dtAccumulator = 0;
+    /**
+     * Update Loop
+     * @param dt Time elapsed since last frame in MS
+     */
     static function update(dt:Ticks) {
+        dtAccumulator += dt;
+        if(dtAccumulator < 50) return;
+
         red = Math.floor(255* Math.random());
         blue = Math.floor(255* Math.random());
 

@@ -5,10 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "HXCPP",
+            "name": "HXCPP Debug Mode",
             "type": "hxcpp",
             "request": "launch",
             "program": "${workspaceFolder}/output/Main-debug.exe"
-        }
+        },
+        {
+            "name": "HXCPP Non Debug",
+            "type": "hxcpp",
+            "request": "launch",
+            "program": "${workspaceFolder}/output/Main.exe"
+        },
     ]
 }
