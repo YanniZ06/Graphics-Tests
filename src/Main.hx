@@ -1,5 +1,6 @@
 package;
 
+import sdl.Keycodes;
 import sys.thread.EventLoop;
 import sdl.Event;
 import sys.thread.Thread;
@@ -23,6 +24,10 @@ class Object {
     }
 }
 
+// Interesting todo:
+
+// Custom Message Boxes using untyped __cpp__ with SDL_ShowMessageBox (https://wiki.libsdl.org/SDL2/SDL_ShowMessageBox)
+// -> example in rust at (https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/message-box.rs#L48) (should be easy to copy to cpp)
 class Main {
     public static var fps(default, set):Int = 30; // Set in Main!!
     static var usedFps:Int = 0;
@@ -41,7 +46,7 @@ class Main {
     static function main() {
         fps = 60;
 
-        SDL.init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+        SDL.init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC);
         state = SDL.createWindowAndRenderer(320, 320, SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
         SDL.setWindowTitle(state.window, "SDL TEST");
         SDL.stopTextInput();
@@ -53,15 +58,17 @@ class Main {
         SDL.destroyRenderer(state.renderer);
     }
 
-    @:functionCode('
+    /**
+     * Fires an SDL Event of the given type.
+     * @param type Type of SDL Event.
+     */
+     @:functionCode('
         SDL_Event event;
-        event.type = SDL_USEREVENT;
+        event.type = eType;
 
         SDL_PushEvent (&event);
-        return event;
     ')
-    static function fireSDLUserEvent():Event {
-        throw 'SDLUSEREVENT CREATION FAILED';
+    static function fireSDLEvent(eType:SDLEventType):Void {
     }
 
     
@@ -95,7 +102,7 @@ class Main {
                     // If onQuit returns true we are actually quitting, otherwise we're not!! Useful for "Save / Cancel" operations
                     continueEventSearch = !(shouldClose = onQuit()) && SDL.hasAnEvent();
 
-                    case SDL_MOUSEBUTTONDOWN: // Mouse Click
+                case SDL_MOUSEBUTTONDOWN: // Mouse Click
                 switch(e.button.button) { // Lets find out what Mouse Part clicked!!
                     case SDL_BUTTON_LEFT: 
                         trace("Currently set FPS: " + fps);
@@ -120,6 +127,11 @@ class Main {
                         
                         textInput = '';
                 }
+                case SDL_KEYDOWN:
+                switch(e.key.keysym.sym) {
+                    case Keycodes.backspace: exit();
+                    default:
+                }
 
                 case SDL_TEXTINPUT:
                     textInput += e.text.text;
@@ -129,6 +141,8 @@ class Main {
             continueEventSearch = SDL.hasAnEvent();
         }
     }
+
+    inline static function exit() fireSDLEvent(SDL_QUIT);
 
     inline static function logWarning(warning:Dynamic) {
         trace('Warning: $warning (Registered at: ${Date.now()})');
