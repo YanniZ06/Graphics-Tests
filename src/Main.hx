@@ -7,6 +7,7 @@ import sys.thread.Thread;
 import haxe.Timer;
 import sdl.SDL;
 import sdl_extend.Mouse.MouseButton;
+import sdl_extend.MessageBox;
 import sdl.Window;
 import sdl.Renderer;
 
@@ -25,7 +26,6 @@ class Object {
 }
 
 // Interesting todo:
-
 // Custom Message Boxes using untyped __cpp__ with SDL_ShowMessageBox (https://wiki.libsdl.org/SDL2/SDL_ShowMessageBox)
 // -> example in rust at (https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/message-box.rs#L48) (should be easy to copy to cpp)
 class Main {
@@ -51,11 +51,19 @@ class Main {
         SDL.setWindowTitle(state.window, "SDL TEST");
         SDL.stopTextInput();
 
+        trace(MessageBoxSys.showCustomMessageBox(
+            'Testing Box',
+            'Wuhoh, this is a test, would you like to continue or quit?',
+            state.window,
+            SDLMessageBoxFlags.SDL_MESSAGEBOX_INFORMATION,
+            [MessageBoxSys.makeMsgBoxButton('Continue', () -> { trace('Continued!'); }), MessageBoxSys.makeMsgBoxButton('Quit', () -> { trace('Fuck you!'); })]
+        ));
         startAppLoop();
 
         // Exiting our application from here on out, we can clean up everything!!
         SDL.destroyWindow(state.window);
         SDL.destroyRenderer(state.renderer);
+        SDL.quit();
     }
 
     /**
