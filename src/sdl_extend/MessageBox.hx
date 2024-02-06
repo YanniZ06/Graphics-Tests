@@ -47,34 +47,16 @@ typedef MsgBoxButton = {
 class MessageBoxSys {
     static var msgBoxButtonCount:Int = 0;
 
-    /* @:functionCode('
-        SDL_MessageBoxButtonData raw = {
-            0,
-            cnt,
-            name
-        };
-        return raw;
-    ')
-    static function boxBtnRaw(name:String, cnt:Int):SDL_MessageBoxButtonData {
-        return untyped __cpp__('{0,cnt++,name}', cnt);
-    } */
-
-
-    public static function makeMsgBoxButton(name:String, onPress:Void->Void):MsgBoxButton {
-        var rawdata:SDL_MessageBoxButtonData = untyped __cpp__('{0, msgBoxButtonCount++, name}');
+    public static function makeMsgBoxButton(name:cpp.ConstCharStar, onPress:Void->Void):MsgBoxButton {
+        var rawdata:SDL_MessageBoxButtonData = untyped __cpp__('{0, ::sdl_extend::MessageBoxSys_obj::msgBoxButtonCount++, name}');
         return {
             rawData: rawdata,
             callerFunc: onPress
         };
     }
 
-    @:include('iostream', true)
     public static function showCustomMessageBox(title:cpp.ConstCharStar, message:cpp.ConstCharStar, window:Window, flags:SDLMessageBoxFlags, buttons:Array<MsgBoxButton>):Int {
-        var boxData:SDL_MessageBoxData = untyped __cpp__('
-            {
-                NULL, NULL, NULL, 0, NULL, NULL, 0, NULL
-            }
-        ');
+        var boxData:SDL_MessageBoxData = untyped __cpp__('{0, NULL, "", "", 0, NULL, NULL}');
         boxData.title = title;
         boxData.message = message;
         boxData.window = window;
@@ -83,22 +65,30 @@ class MessageBoxSys {
         var rawBtnArray:Array<SDL_MessageBoxButtonData> = [];
         for(button in buttons) { rawBtnArray.push(button.rawData); }
 
-        boxData.buttons = untyped __cpp__ ('std::as_const({0})', cpp.Pointer.ofArray(rawBtnArray).ptr);
+        // ! Problem most definetly lies within the const data pointer
+        var btnArrayPtr:cpp.ConstStar<SDL_MessageBoxButtonData> = untyped __cpp__ ('const_cast<const SDL_MessageBoxButtonData*>({0})', cpp.Pointer.ofArray(rawBtnArray).ptr);
+        trace(buttons[1].rawData.buttonid); // ? Gives 1
+        trace(btnArrayPtr.buttonid); // ?! Gives Pseudorandom number "A"
+
+        boxData.buttons = btnArrayPtr;
         boxData.numbuttons = buttons.length;
         boxData.colorScheme = untyped __cpp__('NULL');
 
-        var btnpressed:cpp.Star<Int> = 0;
+        var btn:Int = 0;
+        var btnpressed:cpp.RawPointer<Int> = untyped __cpp__('&btn');
+
         var boxResult:Int = 0;
         untyped __cpp__('
-            const SDL_MessageBoxButtonData* data = {0};
+            const SDL_MessageBoxData* data = &{0};
 
             boxResult = SDL_ShowMessageBox(
                 data,
                 btnpressed
             );
         ', boxData, btnpressed);
+        trace(btnpressed[0]); // ?! When second button with supposed id '1' is pressed, gives same Pseudorandom number "A" as on earlier trace
 
-        buttons[btnpressed].callerFunc();
+        buttons[btnpressed[0]].callerFunc();
         msgBoxButtonCount = 0;
         return boxResult;
     }
