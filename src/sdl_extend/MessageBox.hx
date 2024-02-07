@@ -64,10 +64,12 @@ class MessageBoxSys {
 
         var rawBtnArray:Array<SDL_MessageBoxButtonData> = [];
         for(button in buttons) { rawBtnArray.push(button.rawData); }
+        trace(cpp.Pointer.ofArray(rawBtnArray).constRaw[0].buttonid); // ?! Gives Pseudorandom number "A"
 
-        // ! Problem most definetly lies within the const data pointer
+        // ! Problem most definetly lies within the generated of array data pointer
         var btnArrayPtr:cpp.ConstStar<SDL_MessageBoxButtonData> = untyped __cpp__ ('const_cast<const SDL_MessageBoxButtonData*>({0})', cpp.Pointer.ofArray(rawBtnArray).ptr);
-        trace(buttons[1].rawData.buttonid); // ? Gives 1
+        //trace(buttons[1].rawData.buttonid); // ? Gives 1
+        trace(rawBtnArray[1].buttonid); // ? Also gives 1
         trace(btnArrayPtr.buttonid); // ?! Gives Pseudorandom number "A"
 
         boxData.buttons = btnArrayPtr;
