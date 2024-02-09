@@ -46,24 +46,38 @@ class Main {
     static function main() {
         fps = 60;
 
-        SDL.init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC);
+        if(SDL.init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC) != 0) {
+            throw 'Error initializing SDL subsystems: ${SDL.getError()}';
+        }
+        //var info = getDesktopDisplayMode()
+
+        trace('Displays:');
+        var num_displays = SDL.getNumVideoDisplays();
+        for(display_index in 0 ... num_displays) {
+            var num_modes = SDL.getNumDisplayModes(display_index);
+            var name = SDL.getDisplayName(display_index);
+            trace('\tDisplay $display_index: $name');
+            var desktop_mode = SDL.getDesktopDisplayMode(display_index);
+            trace('\t Desktop Mode: ${desktop_mode.w}x${desktop_mode.h} @ ${desktop_mode.refresh_rate}Hz format:${pixel_format_to_string(desktop_mode.format)}');
+            var current_mode = SDL.getCurrentDisplayMode(display_index);
+            trace('\t Current Mode: ${current_mode.w}x${current_mode.h} @ ${current_mode.refresh_rate}Hz format:${pixel_format_to_string(current_mode.format)}');
+            for(display_mode in 0 ... num_modes) {
+                var mode = SDL.getDisplayMode(display_index, display_mode);
+                trace('\t\t mode:$display_mode ${mode.w}x${mode.h} @ ${mode.refresh_rate}Hz format:${pixel_format_to_string(mode.format)}');
+            }
+        }
+        
+        var compiled = SDL.VERSION();
+        var linked = SDL.getVersion();
+        trace("Versions:");
+        trace('    - We compiled against SDL version ${compiled.major}.${compiled.minor}.${compiled.patch} ...');
+        trace('    - And linked against SDL version ${linked.major}.${linked.minor}.${linked.patch}');
+
+
         state = SDL.createWindowAndRenderer(320, 320, SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
         SDL.setWindowTitle(state.window, "SDL TEST");
         SDL.stopTextInput();
 
-        // Uncomment for MessageBox tests
-        /*
-        var msgBoxContinue = MessageBoxSys.makeMsgBoxButton('Continue', () -> { trace('Continued!'); });
-        var msgBoxQuit = MessageBoxSys.makeMsgBoxButton('Quit', () -> { exit(); });
-
-        MessageBoxSys.showCustomMessageBox(
-            'Testing Box',
-            'Wuhoh, this is a test, would you like to continue or quit?',
-            state.window,
-            SDLMessageBoxFlags.SDL_MESSAGEBOX_INFORMATION,
-            [msgBoxContinue, msgBoxQuit]
-        );
-        //*/
         startAppLoop();
 
         // Exiting our application from here on out, we can clean up everything!!
@@ -76,7 +90,7 @@ class Main {
      * Fires an SDL Event of the given type.
      * @param type Type of SDL Event.
      */
-     @:functionCode('
+    @:functionCode('
         SDL_Event event;
         event.type = eType;
 
@@ -107,6 +121,8 @@ class Main {
         }
     }
 
+    static final msgBoxContinue = MessageBoxSys.makeMsgBoxButton('Continue', () -> {});
+    static final msgBoxQuit = MessageBoxSys.makeMsgBoxButton('Quit', () -> { exit(); });
     inline static function handleSDLEvents():Void {
         var continueEventSearch = SDL.hasAnEvent();
         while(continueEventSearch) {
@@ -143,7 +159,14 @@ class Main {
                 }
                 case SDL_KEYDOWN:
                 switch(e.key.keysym.sym) {
-                    case Keycodes.backspace: exit();
+                    case Keycodes.backspace:         
+                        MessageBoxSys.showCustomMessageBox(
+                            'Quit requested',
+                            'Would you like to continue or quit?',
+                            state.window,
+                            SDLMessageBoxFlags.SDL_MESSAGEBOX_WARNING,
+                            [msgBoxContinue, msgBoxQuit]
+                        );
                     default:
                 }
 
@@ -178,7 +201,6 @@ class Main {
     dynamic static function onQuit():Bool return true;
 
     static function render():Void {
-        // trace("RENDERED!");
         SDL.setRenderDrawColor(state.renderer, red, blue, 255, 255);
         SDL.renderClear(state.renderer);
         SDL.renderPresent(state.renderer);
@@ -202,6 +224,50 @@ class Main {
         frameDurMS = 1 / st;
         usedFps = st;
         return fps = st; 
+    }
+
+
+    static function pixel_format_to_string(format:SDLPixelFormat) {
+        return switch(format) {
+            case SDL_PIXELFORMAT_UNKNOWN     :'UNKNOWN';
+            case SDL_PIXELFORMAT_INDEX1LSB   :'INDEX1LSB';
+            case SDL_PIXELFORMAT_INDEX1MSB   :'INDEX1MSB';
+            case SDL_PIXELFORMAT_INDEX4LSB   :'INDEX4LSB';
+            case SDL_PIXELFORMAT_INDEX4MSB   :'INDEX4MSB';
+            case SDL_PIXELFORMAT_INDEX8      :'INDEX8';
+            case SDL_PIXELFORMAT_RGB332      :'RGB332';
+            case SDL_PIXELFORMAT_RGB444      :'RGB444';
+            case SDL_PIXELFORMAT_RGB555      :'RGB555';
+            case SDL_PIXELFORMAT_BGR555      :'BGR555';
+            case SDL_PIXELFORMAT_ARGB4444    :'ARGB4444';
+            case SDL_PIXELFORMAT_RGBA4444    :'RGBA4444';
+            case SDL_PIXELFORMAT_ABGR4444    :'ABGR4444';
+            case SDL_PIXELFORMAT_BGRA4444    :'BGRA4444';
+            case SDL_PIXELFORMAT_ARGB1555    :'ARGB1555';
+            case SDL_PIXELFORMAT_RGBA5551    :'RGBA5551';
+            case SDL_PIXELFORMAT_ABGR1555    :'ABGR1555';
+            case SDL_PIXELFORMAT_BGRA5551    :'BGRA5551';
+            case SDL_PIXELFORMAT_RGB565      :'RGB565';
+            case SDL_PIXELFORMAT_BGR565      :'BGR565';
+            case SDL_PIXELFORMAT_RGB24       :'RGB24';
+            case SDL_PIXELFORMAT_BGR24       :'BGR24';
+            case SDL_PIXELFORMAT_RGB888      :'RGB888';
+            case SDL_PIXELFORMAT_RGBX8888    :'RGBX8888';
+            case SDL_PIXELFORMAT_BGR888      :'BGR888';
+            case SDL_PIXELFORMAT_BGRX8888    :'BGRX8888';
+            case SDL_PIXELFORMAT_ARGB8888    :'ARGB8888';
+            case SDL_PIXELFORMAT_RGBA8888    :'RGBA8888';
+            case SDL_PIXELFORMAT_ABGR8888    :'ABGR8888';
+            case SDL_PIXELFORMAT_BGRA8888    :'BGRA8888';
+            case SDL_PIXELFORMAT_ARGB2101010 :'ARGB2101010';
+            case SDL_PIXELFORMAT_YV12        :'YV12';
+            case SDL_PIXELFORMAT_IYUV        :'IYUV';
+            case SDL_PIXELFORMAT_YUY2        :'YUY2';
+            case SDL_PIXELFORMAT_UYVY        :'UYVY';
+            case SDL_PIXELFORMAT_YVYU        :'YVYU';
+            case SDL_PIXELFORMAT_NV12        :'NV12';
+            case SDL_PIXELFORMAT_NV21        :'NV21';
+        }
     }
 
 }
