@@ -51,19 +51,19 @@ class Main {
         SDL.setWindowTitle(state.window, "SDL TEST");
         SDL.stopTextInput();
 
+        // Uncomment for MessageBox tests
+        /*
         var msgBoxContinue = MessageBoxSys.makeMsgBoxButton('Continue', () -> { trace('Continued!'); });
-        var msgBoxQuit = MessageBoxSys.makeMsgBoxButton('Quit', () -> { trace('Fuck you!'); });
+        var msgBoxQuit = MessageBoxSys.makeMsgBoxButton('Quit', () -> { exit(); });
 
-        trace(msgBoxContinue);
-        trace(msgBoxQuit);
-        trace(msgBoxQuit.rawData.buttonid);
-        trace(MessageBoxSys.showCustomMessageBox(
+        MessageBoxSys.showCustomMessageBox(
             'Testing Box',
             'Wuhoh, this is a test, would you like to continue or quit?',
             state.window,
             SDLMessageBoxFlags.SDL_MESSAGEBOX_INFORMATION,
             [msgBoxContinue, msgBoxQuit]
-        ));
+        );
+        //*/
         startAppLoop();
 
         // Exiting our application from here on out, we can clean up everything!!
