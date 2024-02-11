@@ -26,8 +26,8 @@ class Object {
 }
 
 // Interesting todo:
-// Custom Message Boxes using untyped __cpp__ with SDL_ShowMessageBox (https://wiki.libsdl.org/SDL2/SDL_ShowMessageBox)
-// -> example in rust at (https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/message-box.rs#L48) (should be easy to copy to cpp)
+// GL Integration
+
 class Main {
     public static var fps(default, set):Int = 30; // Set in Main!!
     static var usedFps:Int = 0;
@@ -41,7 +41,7 @@ class Main {
     static var accumulator:Float;
 
     static var shouldClose:Bool = false;
-    static var state:{ window:Window, renderer:Renderer };
+    static var window:Window;
 
     static function main() {
         fps = 60;
@@ -51,6 +51,7 @@ class Main {
         }
         //var info = getDesktopDisplayMode()
 
+        // /*
         trace('Displays:');
         var num_displays = SDL.getNumVideoDisplays();
         for(display_index in 0 ... num_displays) {
@@ -72,17 +73,23 @@ class Main {
         trace("Versions:");
         trace('    - We compiled against SDL version ${compiled.major}.${compiled.minor}.${compiled.patch} ...');
         trace('    - And linked against SDL version ${linked.major}.${linked.minor}.${linked.patch}');
+        // */
 
+        var displayMode = SDL.getCurrentDisplayMode(0);
+        window = SDL.createWindow("SDL TEST", 
+         cast displayMode.w / 4, cast displayMode.h / 4, // Center of Window should always be half of actual Window dimensions ?? am i tweaking
+         cast displayMode.w / 2, cast displayMode.h / 2,
+         SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
 
-        state = SDL.createWindowAndRenderer(320, 320, SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
-        SDL.setWindowTitle(state.window, "SDL TEST");
+        trace(sdl_extend.Video.getWindowDisplayIndex(window));
+
         SDL.stopTextInput();
 
         startAppLoop();
 
         // Exiting our application from here on out, we can clean up everything!!
-        SDL.destroyWindow(state.window);
-        SDL.destroyRenderer(state.renderer);
+        SDL.destroyWindow(window);
+        // SDL.destroyRenderer(state.renderer);
         SDL.quit();
     }
 
@@ -145,15 +152,15 @@ class Main {
 
                         if(!inputActive) SDL.startTextInput();
                         else SDL.stopTextInput();
-                        SDL.showSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, 'INFO', 'TOGGLED TEXT INPUT: ${!inputActive}', state.window);
+                        SDL.showSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, 'INFO', 'TOGGLED TEXT INPUT: ${!inputActive}', window);
                         textInput = '';
                     default: 
                         final newFps = Std.parseInt(textInput);
                         if(newFps != null && newFps > 0) {
-                            SDL.showSimpleMessageBox(SDL_MESSAGEBOX_WARNING, 'INFO', 'FPS set from $fps to $newFps', state.window);
+                            SDL.showSimpleMessageBox(SDL_MESSAGEBOX_WARNING, 'INFO', 'FPS set from $fps to $newFps', window);
                             fps = newFps;
                         }
-                        else SDL.showSimpleMessageBox(SDL_MESSAGEBOX_WARNING, 'WARNING', 'Could not set FPS to input data: $textInput', state.window);
+                        else SDL.showSimpleMessageBox(SDL_MESSAGEBOX_WARNING, 'WARNING', 'Could not set FPS to input data: $textInput', window);
                         
                         textInput = '';
                 }
@@ -163,7 +170,7 @@ class Main {
                         MessageBoxSys.showCustomMessageBox(
                             'Quit requested',
                             'Would you like to continue or quit?',
-                            state.window,
+                            window,
                             SDLMessageBoxFlags.SDL_MESSAGEBOX_WARNING,
                             [msgBoxContinue, msgBoxQuit]
                         );
@@ -201,9 +208,9 @@ class Main {
     dynamic static function onQuit():Bool return true;
 
     static function render():Void {
-        SDL.setRenderDrawColor(state.renderer, red, blue, 255, 255);
-        SDL.renderClear(state.renderer);
-        SDL.renderPresent(state.renderer);
+        // SDL.setRenderDrawColor(state.renderer, red, blue, 255, 255);
+        // SDL.renderClear(state.renderer);
+        // SDL.renderPresent(state.renderer);
     }
 
     static var red = 255;
@@ -213,8 +220,8 @@ class Main {
      * @param dt Time elapsed since last frame in MS
      */
     static function update(dt:Float) {
-        red = Math.floor(255* Math.random());
-        blue = Math.floor(255* Math.random());
+        // red = Math.floor(255* Math.random());
+        // blue = Math.floor(255* Math.random());
 
         // SDL.setHint(SDL_HINT_RENDER_VSYNC, 'true');
     }
