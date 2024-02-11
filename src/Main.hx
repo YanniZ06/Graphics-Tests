@@ -123,7 +123,8 @@ class Main {
 
                 accumulator -= frameDurMS;
             }
-
+            
+            SDL.delay(1);
             // flurry.tick(accumulator / frameDurMS);
         }
     }
@@ -134,6 +135,7 @@ class Main {
         var continueEventSearch = SDL.hasAnEvent();
         while(continueEventSearch) {
             var e = SDL.pollEvent();
+            
             switch(e.type) {
                 case SDL_QUIT: 
                     // If onQuit returns true we are actually quitting, otherwise we're not!! Useful for "Save / Cancel" operations
