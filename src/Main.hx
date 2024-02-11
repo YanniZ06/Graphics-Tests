@@ -1,15 +1,18 @@
 package;
 
 import sdl.Keycodes;
-import sys.thread.EventLoop;
 import sdl.Event;
-import sys.thread.Thread;
-import haxe.Timer;
 import sdl.SDL;
+import haxe.Timer;
 import sdl_extend.Mouse.MouseButton;
 import sdl_extend.MessageBox;
+import sdl_extend.Video as SDLVideo;
 import sdl.Window;
-import sdl.Renderer;
+import sdl.SDL.GL_SetAttribute as setGLAttrib;
+// import opengl.GL.*;
+
+import opengl.GL;
+import glew.GLEW;
 
 typedef Pos = {
     var x:Float;
@@ -43,15 +46,17 @@ class Main {
     static var shouldClose:Bool = false;
     static var window:Window;
 
+    static var glc:sdl.GLContext;
+
     static function main() {
         fps = 60;
 
         if(SDL.init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC) != 0) {
             throw 'Error initializing SDL subsystems: ${SDL.getError()}';
         }
-        //var info = getDesktopDisplayMode()
 
-        // /*
+
+        /*
         trace('Displays:');
         var num_displays = SDL.getNumVideoDisplays();
         for(display_index in 0 ... num_displays) {
@@ -75,13 +80,34 @@ class Main {
         trace('    - And linked against SDL version ${linked.major}.${linked.minor}.${linked.patch}');
         // */
 
+        setGLAttrib( SDL_GL_RED_SIZE, 5 );
+        setGLAttrib( SDL_GL_GREEN_SIZE, 5 );
+        setGLAttrib( SDL_GL_BLUE_SIZE, 5 );
+        setGLAttrib( SDL_GL_DEPTH_SIZE, 16 );
+        setGLAttrib( SDL_GL_DOUBLEBUFFER, 1 );
+
         var displayMode = SDL.getCurrentDisplayMode(0);
+        final width:Int = cast displayMode.w / 2;
+        final height:Int = cast displayMode.h / 2;
+
         window = SDL.createWindow("SDL TEST", 
-         cast displayMode.w / 4, cast displayMode.h / 4, // Center of Window should always be half of actual Window dimensions ?? am i tweaking
-         cast displayMode.w / 2, cast displayMode.h / 2,
+         cast width / 2, cast height / 2, // Center of Window should always be half of actual Window dimensions ?? am i tweaking
+         width, height,
          SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
 
-        trace(sdl_extend.Video.getWindowDisplayIndex(window));
+        trace(SDLVideo.getWindowDisplayIndex(window));
+
+
+        glc = SDL.GL_CreateContext(window); // Cant check if glc is null, gotta depend on contex tsetting providing work
+        final cRes = SDL.GL_MakeCurrent(window, glc);
+        if(cRes != 0) throw 'Error making context current of window ${SDL.getWindowID(window)}! - ${SDL.getError()}';
+
+        final glew_res = GLEW.init(); // Its important we initialize GLEW AFTER making our context
+        if(glew_res != GLEW.OK) throw 'Failed to initialize GLEW! ' + GLEW.error(glew_res);
+        trace("RUNNING ON OPENGL VERSION: " + GL.glGetString(GL.GL_VERSION));
+
+        trace('Current context is made context?? - ${SDL.GL_GetCurrentContext() == glc}');
+        GL.glViewport(0, 0, width, height); // Set Viewport for first time init
 
         SDL.stopTextInput();
 
@@ -97,13 +123,13 @@ class Main {
      * Fires an SDL Event of the given type.
      * @param type Type of SDL Event.
      */
-    @:functionCode('
-        SDL_Event event;
-        event.type = eType;
+    inline static function fireSDLEvent(eType:SDLEventType):Void {
+        untyped __cpp__('
+            SDL_Event event;
+            event.type = {0};
 
-        SDL_PushEvent (&event);
-    ')
-    static function fireSDLEvent(eType:SDLEventType):Void {
+            SDL_PushEvent (&event);
+        ', eType);
     }
 
     
@@ -111,26 +137,23 @@ class Main {
     static function startAppLoop():Void {
         while(!shouldClose) { 
             final newTime = Timer.stamp();
-            final frameTime = newTime - currentTime;
+            var frameTime = newTime - currentTime;
 
             currentTime = newTime;
             accumulator = if (frameTime > 0.25) accumulator + 0.25 else accumulator + frameTime;
 
             while (accumulator >= frameDurMS) {
                 handleSDLEvents();
-
-                globalUpdate(frameDurMS);
+                globalUpdate(frameDurMS, frameDurMS/*, frameTime*/); // TODO: make this use a time accurate variable to properly show fps and not some "fake value"
 
                 accumulator -= frameDurMS;
+                // frameTime = 0; // TODO: calculate time the frame took and throw it onto the frameTime!!!! 
             }
             
-            SDL.delay(1);
-            // flurry.tick(accumulator / frameDurMS);
+            SDL.delay(1); // If we dont do this our CPU usage turns insanely high
         }
     }
 
-    static final msgBoxContinue = MessageBoxSys.makeMsgBoxButton('Continue', () -> {});
-    static final msgBoxQuit = MessageBoxSys.makeMsgBoxButton('Quit', () -> { exit(); });
     inline static function handleSDLEvents():Void {
         var continueEventSearch = SDL.hasAnEvent();
         while(continueEventSearch) {
@@ -138,9 +161,15 @@ class Main {
             
             switch(e.type) {
                 case SDL_QUIT: 
-                    // If onQuit returns true we are actually quitting, otherwise we're not!! Useful for "Save / Cancel" operations
-                    continueEventSearch = !(shouldClose = onQuit()) && SDL.hasAnEvent();
+                    // If handleQuitReq returns true we are actually quitting, otherwise we're not!! Useful for "Save / Cancel" operations
+                    continueEventSearch = !(shouldClose = handleQuitReq()) && SDL.hasAnEvent();
 
+                case SDL_WINDOWEVENT: 
+                switch(e.window.event) {
+                    case SDL_WINDOWEVENT_RESIZED:
+                        GL.glViewport(0, 0, e.window.data1, e.window.data2);
+                    default:
+                }
                 case SDL_MOUSEBUTTONDOWN: // Mouse Click
                 switch(e.button.button) { // Lets find out what Mouse Part clicked!!
                     case SDL_BUTTON_LEFT: 
@@ -169,13 +198,7 @@ class Main {
                 case SDL_KEYDOWN:
                 switch(e.key.keysym.sym) {
                     case Keycodes.backspace:         
-                        MessageBoxSys.showCustomMessageBox(
-                            'Quit requested',
-                            'Would you like to continue or quit?',
-                            window,
-                            SDLMessageBoxFlags.SDL_MESSAGEBOX_WARNING,
-                            [msgBoxContinue, msgBoxQuit]
-                        );
+                        reqExit();
                     default:
                 }
 
@@ -188,43 +211,62 @@ class Main {
         }
     }
 
-    inline static function exit() fireSDLEvent(SDL_QUIT);
+    // Requests an exit operation
+    inline static function reqExit() fireSDLEvent(SDL_QUIT);
 
     inline static function logWarning(warning:Dynamic) {
         trace('Warning: $warning (Registered at: ${Date.now()})');
     } 
 
     static var _fpsSecCnt:Float = 0;
-    #if !debug inline #end static function globalUpdate(dt:Float):Void { 
+    #if !debug inline #end static function globalUpdate(dt:Float, lastAccumTime:Float):Void { 
         update(dt);
+        // draw here!
         render();
 
         _curFPSCnt++;
-        _fpsSecCnt += dt;
+        _fpsSecCnt += lastAccumTime;
         if(_fpsSecCnt >= 1) {
             usedFps = _curFPSCnt;
             _fpsSecCnt = _curFPSCnt = 0; // Reset FPS 
         }
     }
 
-    dynamic static function onQuit():Bool return true;
+    static final msgBoxContinue = MessageBoxSys.makeMsgBoxButton('Continue', () -> {});
+    static final msgBoxQuit = MessageBoxSys.makeMsgBoxButton('Quit', () -> { mayQuit = true; });
+    static var mayQuit:Bool = false;
+    dynamic static function handleQuitReq():Bool {
+        MessageBoxSys.showCustomMessageBox(
+            'Quit requested',
+            'Would you like to continue or quit?',
+            window,
+            SDLMessageBoxFlags.SDL_MESSAGEBOX_WARNING,
+            [msgBoxContinue, msgBoxQuit]
+        );
+
+        return mayQuit;
+    }
 
     static function render():Void {
         // SDL.setRenderDrawColor(state.renderer, red, blue, 255, 255);
         // SDL.renderClear(state.renderer);
         // SDL.renderPresent(state.renderer);
+        GL.glClearColor(red, 1, blue, 1);
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT);
+
+        SDL.GL_SwapWindow(window);
     }
 
-    static var red = 255;
-    static var blue = 255;
+    static var red = 0.1;
+    static var blue = 0.1;
     /**
      * Update Loop
      * @param dt Time elapsed since last frame in MS
      */
     static function update(dt:Float) {
-        // red = Math.floor(255* Math.random());
-        // blue = Math.floor(255* Math.random());
-
+        red = Math.random();
+        blue = Math.random();
+/
         // SDL.setHint(SDL_HINT_RENDER_VSYNC, 'true');
     }
 
