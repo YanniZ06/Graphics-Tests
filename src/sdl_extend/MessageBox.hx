@@ -71,8 +71,9 @@ class MessageBoxSys {
         boxData.flags = flags;
 
         final len:Int = buttons.length;
-        var rawArr:Array<SDL_MessageBoxButtonData> = [];
-        for(b in buttons) rawArr.push(b.rawData);
+
+        /* var rawArr:Array<SDL_MessageBoxButtonData> = [];
+        for(b in buttons) rawArr.push(b.rawData); */
         var btnArrayPtr:cpp.Star<SDL_MessageBoxButtonData> = cpp.Native.malloc(cpp.Native.sizeof(SDL_MessageBoxButtonData) * len);
         // btnArrayPtr = untyped __cpp__('(SDL_MessageBoxButtonData *) {0}->Pointer()', rawArr); // Seems pointless with custom data. Whyever it does that!!
         for(i in 0...len) {

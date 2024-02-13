@@ -39,7 +39,7 @@ abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
      */
     public static function fromArray<T>(array:Array<T>):StarArray<T> {
         var strarr = new IStarArray<T>();
-        strarr.data = untyped __cpp__('{0}->Pointer()', array);
+        strarr.data = untyped __cpp__('({1}*){0}->Pointer()', array, T);
         strarr.currentIndex = 0;
 
         return strarr;
@@ -74,6 +74,7 @@ abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
     }
 }
 
+// Base implementation to build the abstract on
 private class IStarArray<T> {
     public var data:Star<T>;
     public var length:Int;
