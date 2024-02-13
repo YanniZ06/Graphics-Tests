@@ -1,5 +1,13 @@
 package;
 
+import haxe.ds.Vector;
+import haxe.io.BytesOutput;
+import haxe.io.BytesBuffer;
+import haxe.io.BytesData;
+import haxe.io.Bytes;
+
+import cpp.Native;
+import cpp.Float32;
 import sdl.Keycodes;
 import sdl.Event;
 import sdl.SDL;
@@ -13,6 +21,7 @@ import sdl.SDL.GL_SetAttribute as setGLAttrib;
 
 import opengl.GL;
 import glew.GLEW;
+import graphics.oglh.GLH;
 
 typedef Pos = {
     var x:Float;
@@ -31,6 +40,7 @@ class Object {
 // Interesting todo:
 // GL Integration
 
+@:headerInclude('iostream')
 class Main {
     public static var fps(default, set):Int = 30; // Set in Main!!
     static var usedFps:Int = 0;
@@ -91,7 +101,7 @@ class Main {
         final height:Int = cast displayMode.h / 2;
 
         window = SDL.createWindow("SDL TEST", 
-         cast width / 2, cast height / 2, // Center of Window should always be half of actual Window dimensions ?? am i tweaking
+         cast width / 2, cast height / 2, // ! TODO, calculate left and right pixels left with certain width and add them together to get centering x (and same for y [w & h])
          width, height,
          SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
 
@@ -104,13 +114,53 @@ class Main {
 
         final glew_res = GLEW.init(); // Its important we initialize GLEW AFTER making our context
         if(glew_res != GLEW.OK) throw 'Failed to initialize GLEW! ' + GLEW.error(glew_res);
-        trace("RUNNING ON OPENGL VERSION: " + GL.glGetString(GL.GL_VERSION));
+        
+        var glV:String;
+        try { glV = GLH.getString(GL.GL_VERSION); }
+        catch(e) { throw 'Could not automatically get current OpenGL version. Please check manually. (GL 3.3 is required) [ERROR::$e]'; }
+
+        if(!GLEW.VERSION_3_3) 
+            throw 'OpenGL version 3.3 is not supported on this device.
+            \nCheck if your drivers are installed properly and if your GPU supports GL 3.3.
+            \nRegistered Version: $glV';
+
+        trace("RUNNING ON OPENGL VERSION: " + glV);
+        trace("GLSL VERSION IS: " + GLH.getString(GL.GL_SHADING_LANGUAGE_VERSION));
 
         trace('Current context is made context?? - ${SDL.GL_GetCurrentContext() == glc}');
+        trace('Vendor: ${GLH.getString(GL.GL_VENDOR)}');
+
+        var bo = new BytesOutput();
+        bo.prepare(4*9);
+        final vertices:Array<Float> = [
+            -0.5, -0.5, 0.0,
+            0.5, -0.5, 0.0,
+            0.0,  0.5, 0.0
+        ];
+        for(id=>v in vertices) bo.writeFloat(v);
+
+        var data = bo.getBytes().getData();
+        trace(data);
+        trace(data.length);
+
+
+        // var arr:cpph.StarArray = new cpph.StarArray(9);
+        // trace(arr.data);
+
+        //GL.glBufferData(GL.GL_ARRAY_BUFFER, Native.sizeof(data), vertices, GL.GL_STATIC_DRAW);
+
+        var arrayT:Array<Int> = [5,1,2,3,4,5,6,7];
+        untyped __cpp__('
+        // int arrTest[8] = reinterpret_cast<int [8]>({0}->Pointer());
+        int * aPtr = {0}->Pointer(); // Gold mine
+
+        std::cout << *aPtr << "\\n"'
+        , arrayT);
+        trace("test !!!");
         GL.glViewport(0, 0, width, height); // Set Viewport for first time init
 
         SDL.stopTextInput();
-
+        
         startAppLoop();
 
         // Exiting our application from here on out, we can clean up everything!!
@@ -248,9 +298,6 @@ class Main {
     }
 
     static function render():Void {
-        // SDL.setRenderDrawColor(state.renderer, red, blue, 255, 255);
-        // SDL.renderClear(state.renderer);
-        // SDL.renderPresent(state.renderer);
         GL.glClearColor(red, 1, blue, 1);
         GL.glClear(GL.GL_COLOR_BUFFER_BIT);
 
@@ -266,7 +313,7 @@ class Main {
     static function update(dt:Float) {
         red = Math.random();
         blue = Math.random();
-/
+
         // SDL.setHint(SDL_HINT_RENDER_VSYNC, 'true');
     }
 
@@ -319,6 +366,11 @@ class Main {
             case SDL_PIXELFORMAT_NV12        :'NV12';
             case SDL_PIXELFORMAT_NV21        :'NV21';
         }
+    }
+
+    static function drawTriangle() {
+        // GL.glBufferData(GL.GL_ARRAY_BUFFER, Native.sizeof(data), vertices, GL.GL_STATIC_DRAW);
+
     }
 
 }
