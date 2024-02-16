@@ -16,6 +16,6 @@ abstract VertexData(Array<Float32>) from Array<Float32> to Array<Float32> {
         return [x,y,z];
         
         var arr:Array<Float32> = [];
-        arr.
+        // arr.
     }
 }

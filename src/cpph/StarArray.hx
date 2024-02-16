@@ -2,15 +2,20 @@ package cpph;
 
 import cpp.Star;
 import cpp.Native;
-import cpp.Native.sizeof;
+//import cpp.Native.sizeof;
 
 /**
  * A C++ specific array that internally is handled like a pointer (star).
  * 
  * Provides a regular haxe-like array interface with access to the underlying pointer, and more C++ specific properties.
+ * 
+ * `T` may not be Dynamic
  */
 // ?  @:transitive @:multiType
-abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
+@:generic
+abstract StarArray<T>(IStarArray<T>) from IStarArray<T> to IStarArray<T> {
+    // private inline function elem_size<T>(obj:T) return untyped __cpp__('sizeof({0})', obj);
+
     public var data(get, never):Star<T>;
     function get_data():Star<T> return this.data;
 
@@ -18,7 +23,9 @@ abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
     function get_length():Int return this.length;
 
     public var size(get, never):Int;
-    function get_size():Int return Native.malloc(sizeof(T) * length);
+    function get_size():Int return sizeof() * length;
+
+    inline function sizeof():Int return IStarArray.sizeof();
 
     // function set_data
 
@@ -27,16 +34,15 @@ abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
 	**/
 	public function new(expectedElements:Int = 1):Void {
         this = new IStarArray<T>();
-
-        this.data = cast(Native.malloc(sizeof(T) * expectedElements), Star<T>);
+        this.data = Native.malloc(sizeof() * expectedElements);
         this.currentIndex = 0;
     };
 
-    @:from
     /**
      * Creates a StarArray from a haxe Array.
      * Only guaruanteed to work with basic types, as important information might be lost on conversions for more complex types.
      */
+    @:from @:generic
     public static function fromArray<T>(array:Array<T>):StarArray<T> {
         var strarr = new IStarArray<T>();
         strarr.data = untyped __cpp__('({1}*){0}->Pointer()', array, T);
@@ -55,10 +61,8 @@ abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
         return null;
     }*/
 
-
-
     @:arrayAccess public inline function get(index:Int):Null<T> {
-        final changeReq:Int = index - currentIndex;
+        final changeReq:Int = index - this.currentIndex;
 
         untyped __cpp__('{0} = {0} + {1}', this.data, changeReq);
         this.currentIndex = index;
@@ -66,7 +70,7 @@ abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
     }
 
     @:arrayAccess public inline function set(index:Int, value:T):Void {
-        final changeReq:Int = index - currentIndex;
+        final changeReq:Int = index - this.currentIndex;
 
         untyped __cpp__('{0} = {0} + {1}', this.data, changeReq);
         this.currentIndex = index;
@@ -75,12 +79,30 @@ abstract StarArray<T>(IStarArray) from IStarArray<T> to IStarArray<T> {
 }
 
 // Base implementation to build the abstract on
+@:generic
 private class IStarArray<T> {
+    @:generic
+    public function sizeof<SizeT>(obj:SizeT):Int return Native.sizeof(SizeT);
+
     public var data:Star<T>;
     public var length:Int;
     public var size:Int;
 
+    @:allow(cpph.StarArray)
+    var elemType:T; // VERY HACKY!
+
     public var currentIndex:Int;
 
     public function new() {};
+
+    /*@:templatedCall
+    public static function fromArray<T>(array:Array<T>):StarArray<T> {
+        var strarr = new IStarArray<T>();
+        strarr.data = untyped __cpp__('({1}*){0}->Pointer()', array, T);
+        strarr.currentIndex = 0;
+
+        return strarr;
+    }
+
+    static function getTypeFromFirstArrayElem()*/
 }

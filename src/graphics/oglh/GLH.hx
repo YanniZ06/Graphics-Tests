@@ -1,6 +1,7 @@
 package graphics.oglh;
 
 import opengl.GL;
+import cpph.StarArray;
 /**
  * GL Helper class for bindings and the like
  */
@@ -15,7 +16,10 @@ extern class GLH {
         return untyped __cpp__("(const char*)glGetStringi({0},{1})", name,index);
     }
 
-    /* inline static function glBufferData(target:Int, size:Int, data:BytesData, usage:Int) : Void { 
-        untyped __cpp__("glBufferData({0}, {1}, (const void*)&({2}[0]), {3})", target, size, data, usage); 
-    }*/
+    // const_cast<const void*>(ptr)
+    // same as the below but safer??
+    // (const void*) ptr
+    inline static function bufferData(target:Int, size:Int, data:StarArray<cpp.Float32>, usage:Int) : Void { 
+        untyped __cpp__("glBufferData({0}, {1}, const_cast<const void*>({2}), {3})", target, size, data.data, usage); 
+    }
 }

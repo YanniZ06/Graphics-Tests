@@ -1,5 +1,6 @@
 package;
 
+import haxe.Template;
 import haxe.ds.Vector;
 import haxe.io.BytesOutput;
 import haxe.io.BytesBuffer;
@@ -37,6 +38,21 @@ class Object {
     }
 }
 
+@:generic
+class Test<T> {
+    var val:T;
+    public function new() {}
+    public inline function getSize():Int {
+        // return untyped __cpp__('sizeof({0})', T);
+         return getSize_(val);
+    }
+
+    //@:templatedCall
+    private function getSize_<T>(t:T):Int {
+        return untyped __cpp__('sizeof({0})', t);
+        // return 0;
+    }
+}
 // Interesting todo:
 // GL Integration
 
@@ -60,6 +76,9 @@ class Main {
 
     static function main() {
         fps = 60;
+
+        var test = new Test<sdl.Window>();
+        trace(test.getSize());
 
         if(SDL.init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC) != 0) {
             throw 'Error initializing SDL subsystems: ${SDL.getError()}';
